@@ -1,10 +1,12 @@
 extern crate amd64;
 extern crate memmap;
 
+use amd64::{Register, Assembler};
 use memmap::MmapMut;
 
 use std::fs::File;
 use std::io::Read;
+use std::slice::Iter;
 
 enum Instruction {
     Increment,
@@ -22,9 +24,8 @@ fn main() {
     file.read_to_string(&mut buf).unwrap();
 
     let program = parse(&mut buf.chars(), false);
+    let code = compile(&program);
 
-    // TODO
-    let code = Vec::new();
     let mut m = MmapMut::map_anon(code.len()).unwrap();
     for (i, c) in code.iter().enumerate() {
         m[i] = *c;
@@ -64,4 +65,36 @@ fn parse<'a>(code: &mut std::str::Chars<'a>, loopp: bool) -> Vec<Instruction> {
     }
 
     program
+}
+
+fn compile(program: &[Instruction]) -> Vec<u8> {
+    let mut asm = Assembler::new();
+    _compile(&mut program.iter(), &mut asm);
+    return asm.finish();
+}
+
+fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
+    for inst in program {
+        match inst {
+            Instruction::Increment => (),//asm.add_addr_u8(Register::RDI, 1),
+            Instruction::Decrement => (),//asm.sub_addr_u8(Register::RDI, 1),
+            Instruction::Forward => (),//asm.add_reg_u8(Register::RDI, 1),
+            Instruction::Back => asm.sub_reg_u8(Register::RDI, 1),
+            // TODO
+            Instruction::Print => (),
+            // TODO
+            Instruction::Read => (),
+            Instruction::Loop(p) => {
+                asm.label("l");
+                asm.mov_reg_addr(Register::R9, Register::RDI, None);
+                asm.test(Register::R9, Register::R9);
+                asm.jz("done");
+                _compile(&mut p.iter(), asm);
+                asm.mov_reg_addr(Register::R9, Register::RDI, None);
+                asm.test(Register::R9, Register::R9);
+                asm.jnz("loop");
+                asm.label("done");
+            }
+        }
+    }
 }

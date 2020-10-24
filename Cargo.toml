@@ -1,5 +1,5 @@
 [package]
-name = "Hunter"
+name = "bf"
 version = "0.1.0"
 authors = ["Hunter Praska <hunter@wiggin-labs.com>"]
 
@@ -8,3 +8,6 @@ memmap = "0.7.0"
 
 [dependencies.amd64]
 git = "https://git.hunterpraska.com/hunter/incarnation"
+
+[patch."https://git.hunterpraska.com/hunter/incarnation"]
+amd64 = { path = "../../../Projects/compilers/incarnation/amd64" }
