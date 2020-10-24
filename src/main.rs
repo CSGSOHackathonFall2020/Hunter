@@ -7,6 +7,7 @@ use memmap::MmapMut;
 use std::fs::File;
 use std::io::Read;
 use std::slice::Iter;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 enum Instruction {
     Increment,
@@ -76,25 +77,32 @@ fn compile(program: &[Instruction]) -> Vec<u8> {
 fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
     for inst in program {
         match inst {
-            Instruction::Increment => (),//asm.add_addr_u8(Register::RDI, 1),
-            Instruction::Decrement => (),//asm.sub_addr_u8(Register::RDI, 1),
-            Instruction::Forward => (),//asm.add_reg_u8(Register::RDI, 1),
+            Instruction::Increment => asm.add_addr_u8(Register::RDI, 1),
+            Instruction::Decrement => asm.sub_addr_u8(Register::RDI, 1),
+            Instruction::Forward => asm.add_reg_u8(Register::RDI, 1),
             Instruction::Back => asm.sub_reg_u8(Register::RDI, 1),
             // TODO
             Instruction::Print => (),
             // TODO
             Instruction::Read => (),
             Instruction::Loop(p) => {
-                asm.label("l");
+                let loopl = make_label();
+                let donel = make_label();
+                asm.label(loopl.clone());
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
                 asm.test(Register::R9, Register::R9);
-                asm.jz("done");
+                asm.jz(donel.clone());
                 _compile(&mut p.iter(), asm);
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
                 asm.test(Register::R9, Register::R9);
-                asm.jnz("loop");
-                asm.label("done");
+                asm.jnz(loopl);
+                asm.label(donel);
             }
         }
     }
+}
+
+fn make_label() -> String {
+    static LABEL: AtomicUsize = AtomicUsize::new(0);
+    LABEL.fetch_add(1, Ordering::SeqCst).to_string()
 }
