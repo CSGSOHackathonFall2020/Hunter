@@ -28,30 +28,16 @@ fn main() {
 
     let program = parse(&mut buf.chars(), false);
     let code = compile(&program);
-    //println!("{:x?}", code);
 
     let mut m = MmapMut::map_anon(code.len()).unwrap();
     for (i, c) in code.iter().enumerate() {
         m[i] = *c;
     }
     let m = m.make_exec().unwrap();
-    //let myfunc = unsafe { std::mem::transmute::<*const u8, fn(*mut u8)>(m.as_ptr()) };
+    let myfunc = unsafe { std::mem::transmute::<*const u8, fn(*mut u8)>(m.as_ptr()) };
     // 10 MB
-    //let mut data = vec![0; 10*1024*1024];
-    //let mut data = vec![0; 20];
-    //myfunc(data.as_mut_ptr());
-    //println!("{:?}", data);
-    call(m.as_ptr());
-}
-
-pub extern fn call(m: *const u8) {
-    let myfunc = unsafe { std::mem::transmute::<*const u8, fn(*mut u8)>(m) };
-    // 10 MB
-    //let mut data = vec![0; 10*1024*1024];
-    let mut data = vec![0; 20];
-    let d = data.as_mut_ptr();
-    myfunc(d);
-    println!("{:?}", data);
+    let mut data = vec![0; 10*1024*1024];
+    myfunc(data.as_mut_ptr());
 }
 
 fn parse<'a>(code: &mut std::str::Chars<'a>, loopp: bool) -> Vec<Instruction> {
@@ -97,7 +83,6 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
             Instruction::Decrement => asm.sub_addr_u8(Register::RDI, 1),
             Instruction::Forward => asm.add_reg_u8(Register::RDI, 1),
             Instruction::Back => asm.sub_reg_u8(Register::RDI, 1),
-            // TODO
             Instruction::Print => {
                 asm.push_reg(Register::RDI);
                 // syscall
@@ -129,10 +114,12 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
                 let donel = make_label();
                 asm.label(loopl.clone());
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
+                asm.and_reg_imm(Register::R9, 0xff);
                 asm.test(Register::R9, Register::R9);
                 asm.jz(donel.clone());
                 _compile(&mut p.iter(), asm);
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
+                asm.and_reg_imm(Register::R9, 0xff);
                 asm.test(Register::R9, Register::R9);
                 asm.jnz(loopl);
                 asm.label(donel);
