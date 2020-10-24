@@ -23,7 +23,7 @@ enum Instruction {
 
 fn main() {
     let mut buf = String::new();
-    let mut file = File::open("hello.bf").unwrap();
+    let mut file = File::open("rot13.bf").unwrap();
     file.read_to_string(&mut buf).unwrap();
 
     let program = parse(&mut buf.chars(), false);
@@ -96,18 +96,18 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
                 asm.syscall();
                 asm.pop_reg(Register::RDI);
             }
-            // TODO
             Instruction::Read => {
+                asm.push_reg(Register::RDI);
                 // syscall
-                asm.mov_reg_imm(Register::RAX, Immediate::U8(0));
+                asm.mov_reg_imm(Register::RAX, Immediate::U32(0));
                 // buf
                 asm.mov_reg_reg(Register::RSI, Register::RDI);
                 // fd: stdin
-                asm.mov_reg_imm(Register::RDI, Immediate::U8(0));
+                asm.mov_reg_imm(Register::RDI, Immediate::U32(0));
                 // count
-                asm.mov_reg_imm(Register::RDX, Immediate::U8(1));
+                asm.mov_reg_imm(Register::RDX, Immediate::U32(1));
                 asm.syscall();
-                asm.mov_reg_reg(Register::RDI, Register::RSI);
+                asm.pop_reg(Register::RDI);
             }
             Instruction::Loop(p) => {
                 let loopl = make_label();
