@@ -23,6 +23,7 @@ name = "bf"
 version = "0.1.0"
 dependencies = [
  "amd64",
+ "asm-syntax",
  "memmap",
 ]
 
