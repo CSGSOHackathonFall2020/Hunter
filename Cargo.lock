@@ -3,6 +3,7 @@
 [[package]]
 name = "amd64"
 version = "0.1.0"
+source = "git+https://git.hunterpraska.com/hunter/incarnation#05a652c7b622baec8ea8e349cc1216c168e7c874"
 dependencies = [
  "asm-syntax",
  "byteorder",
@@ -12,6 +13,7 @@ dependencies = [
 [[package]]
 name = "asm-syntax"
 version = "0.1.0"
+source = "git+https://git.hunterpraska.com/hunter/incarnation#05a652c7b622baec8ea8e349cc1216c168e7c874"
 dependencies = [
  "derive_is_enum_variant",
  "string-interner",
@@ -78,6 +80,7 @@ checksum = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 [[package]]
 name = "string-interner"
 version = "0.1.0"
+source = "git+https://git.hunterpraska.com/hunter/incarnation#05a652c7b622baec8ea8e349cc1216c168e7c874"
 
 [[package]]
 name = "syn"
@@ -102,6 +105,7 @@ dependencies = [
 [[package]]
 name = "tokenizer"
 version = "0.1.0"
+source = "git+https://git.hunterpraska.com/hunter/incarnation#05a652c7b622baec8ea8e349cc1216c168e7c874"
 dependencies = [
  "derive_is_enum_variant",
 ]

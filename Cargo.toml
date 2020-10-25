@@ -11,7 +11,3 @@ git = "https://git.hunterpraska.com/hunter/incarnation"
 
 [dependencies.asm-syntax]
 git = "https://git.hunterpraska.com/hunter/incarnation"
-
-[patch."https://git.hunterpraska.com/hunter/incarnation"]
-amd64 = { path = "../../../Projects/compilers/incarnation/amd64" }
-asm-syntax = { path = "../../../Projects/compilers/incarnation/asm-syntax" }
