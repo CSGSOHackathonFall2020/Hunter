@@ -8,25 +8,33 @@ use memmap::MmapMut;
 
 use std::fs::File;
 use std::io::Read;
+use std::iter::Peekable;
 use std::slice::Iter;
+use std::str::Chars;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 enum Instruction {
-    Increment,
-    Decrement,
-    Forward,
-    Back,
+    Increment(u8),
+    Decrement(u8),
+    Forward(u32),
+    Back(u32),
     Print,
     Read,
     Loop(Vec<Instruction>)
 }
 
 fn main() {
+    let args: Vec<_> = std::env::args().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: {} <Directory>", args[0]);
+        std::process::exit(1);
+    }
+
     let mut buf = String::new();
-    let mut file = File::open("rot13.bf").unwrap();
+    let mut file = File::open(&args[1]).unwrap();
     file.read_to_string(&mut buf).unwrap();
 
-    let program = parse(&mut buf.chars(), false);
+    let program = parse(&mut buf.chars().peekable(), false);
     let code = compile(&program);
 
     let mut m = MmapMut::map_anon(code.len()).unwrap();
@@ -40,14 +48,42 @@ fn main() {
     myfunc(data.as_mut_ptr());
 }
 
-fn parse<'a>(code: &mut std::str::Chars<'a>, loopp: bool) -> Vec<Instruction> {
+fn parse<'a>(code: &mut Peekable<Chars<'a>>, loopp: bool) -> Vec<Instruction> {
     let mut program = Vec::new();
     while let Some(c) = code.next() {
         match c {
-            '>' => program.push(Instruction::Forward),
-            '<' => program.push(Instruction::Back),
-            '+' => program.push(Instruction::Increment),
-            '-' => program.push(Instruction::Decrement),
+            '>' => {
+                let mut i = 1;
+                while let Some('>') = code.peek() {
+                    code.next();
+                    i += 1;
+                }
+                program.push(Instruction::Forward(i));
+            }
+            '<' => {
+                let mut i = 1;
+                while let Some('<') = code.peek() {
+                    code.next();
+                    i += 1;
+                }
+                program.push(Instruction::Back(i));
+            }
+            '+' => {
+                let mut i = 1;
+                while let Some('+') = code.peek() {
+                    code.next();
+                    i += 1;
+                }
+                program.push(Instruction::Increment(i));
+            }
+            '-' => {
+                let mut i = 1;
+                while let Some('-') = code.peek() {
+                    code.next();
+                    i += 1;
+                }
+                program.push(Instruction::Decrement(i));
+            }
             '.' => program.push(Instruction::Print),
             ',' => program.push(Instruction::Read),
             '[' => program.push(Instruction::Loop(parse(code, true))),
@@ -79,10 +115,10 @@ fn compile(program: &[Instruction]) -> Vec<u8> {
 fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
     for inst in program {
         match inst {
-            Instruction::Increment => asm.add_addr_u8(Register::RDI, 1),
-            Instruction::Decrement => asm.sub_addr_u8(Register::RDI, 1),
-            Instruction::Forward => asm.add_reg_u8(Register::RDI, 1),
-            Instruction::Back => asm.sub_reg_u8(Register::RDI, 1),
+            Instruction::Increment(i) => asm.add_addr_u8(Register::RDI, *i),
+            Instruction::Decrement(i) => asm.sub_addr_u8(Register::RDI, *i),
+            Instruction::Forward(i) => asm.add_reg_u32(Register::RDI, *i),
+            Instruction::Back(i) => asm.sub_reg_u32(Register::RDI, *i),
             Instruction::Print => {
                 asm.push_reg(Register::RDI);
                 // syscall
