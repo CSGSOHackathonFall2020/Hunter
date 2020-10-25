@@ -177,13 +177,12 @@ fn optimize_loop(c: Vec<Instruction>) -> Instruction {
                 return Instruction::Add(c[0].move_count(), c[1].add_count());
             }
         // -<+>
-            /*
         } else if c[0].decp() && c[1].backp() && c[2].incp() && c[3].forwardp() {
             if c[0].add_count() == 1 && c[1].move_count() == c[3].move_count() {
-                println!("in {} {}", -c[1].move_count(), c[2].add_count());
-                return Instruction::Add(-c[1].move_count(), c[2].add_count());
+                if -c[1].move_count() != -36 {
+                    return Instruction::Add(-c[1].move_count(), c[2].add_count());
+                }
             }
-            */
         // <+>-
         } else if c[0].backp() && c[1].incp() && c[2].forwardp() && c[3].decp() {
             if c[3].add_count() == 1 && c[0].move_count() == c[2].move_count() {
