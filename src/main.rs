@@ -13,6 +13,7 @@ use std::slice::Iter;
 use std::str::Chars;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[derive(Debug, PartialEq)]
 enum Instruction {
     Increment(u8),
     Decrement(u8),
@@ -20,7 +21,8 @@ enum Instruction {
     Back(u32),
     Print,
     Read,
-    Loop(Vec<Instruction>)
+    Loop(Vec<Instruction>),
+    SetToZero,
 }
 
 fn main() {
@@ -86,7 +88,17 @@ fn parse<'a>(code: &mut Peekable<Chars<'a>>, loopp: bool) -> Vec<Instruction> {
             }
             '.' => program.push(Instruction::Print),
             ',' => program.push(Instruction::Read),
-            '[' => program.push(Instruction::Loop(parse(code, true))),
+            '[' => {
+                let c = parse(code, true);
+                if c.len() == 0 {
+                    continue;
+                }
+                if c.len() == 1 && c[0] == Instruction::Decrement(1) {
+                    program.push(Instruction::SetToZero);
+                } else {
+                    program.push(Instruction::Loop(c));
+                }
+            }
             ']' => if loopp {
                 return program;
             } else {
@@ -145,6 +157,7 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
                 asm.syscall();
                 asm.pop_reg(Register::RDI);
             }
+            Instruction::SetToZero => asm.mov_addr_imm(Register::RDI, None, Immediate::U8(0)),
             Instruction::Loop(p) => {
                 let loopl = make_label();
                 let donel = make_label();
