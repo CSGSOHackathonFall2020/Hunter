@@ -3,12 +3,13 @@ extern crate asm_syntax;
 extern crate memmap;
 
 use amd64::{Register, Assembler};
-use asm_syntax::Immediate;
+use asm_syntax::{Displacement, Immediate};
 use memmap::MmapMut;
 
 use std::fs::File;
 use std::io::Read;
 use std::iter::Peekable;
+use std::num::{NonZeroI8, NonZeroI16, NonZeroI32};
 use std::slice::Iter;
 use std::str::Chars;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -23,6 +24,52 @@ enum Instruction {
     Read,
     Loop(Vec<Instruction>),
     SetToZero,
+    Add(i32),
+    Sub(i32),
+}
+
+impl Instruction {
+    fn incp(&self) -> bool {
+        match self {
+            Instruction::Increment(_) => true,
+            _ => false,
+        }
+    }
+
+    fn decp(&self) -> bool {
+        match self {
+            Instruction::Decrement(_) => true,
+            _ => false,
+        }
+    }
+
+    fn forwardp(&self) -> bool {
+        match self {
+            Instruction::Forward(_) => true,
+            _ => false,
+        }
+    }
+
+    fn backp(&self) -> bool {
+        match self {
+            Instruction::Back(_) => true,
+            _ => false,
+        }
+    }
+
+    fn add_count(&self) -> u8 {
+        match self {
+            Instruction::Increment(i) | Instruction::Decrement(i) => *i,
+            _ => unreachable!(),
+        }
+    }
+
+    fn move_count(&self) -> i32 {
+        match self {
+            Instruction::Forward(i) | Instruction::Back(i) => *i as i32,
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn main() {
@@ -47,7 +94,8 @@ fn main() {
     let myfunc = unsafe { std::mem::transmute::<*const u8, fn(*mut u8)>(m.as_ptr()) };
     // 10 MB
     let mut data = vec![0; 10*1024*1024];
-    myfunc(data.as_mut_ptr());
+    let d = data.as_mut_ptr();
+    myfunc(d);
 }
 
 fn parse<'a>(code: &mut Peekable<Chars<'a>>, loopp: bool) -> Vec<Instruction> {
@@ -92,11 +140,8 @@ fn parse<'a>(code: &mut Peekable<Chars<'a>>, loopp: bool) -> Vec<Instruction> {
                 let c = parse(code, true);
                 if c.len() == 0 {
                     continue;
-                }
-                if c.len() == 1 && c[0] == Instruction::Decrement(1) {
-                    program.push(Instruction::SetToZero);
                 } else {
-                    program.push(Instruction::Loop(c));
+                    program.push(optimize_loop(c));
                 }
             }
             ']' => if loopp {
@@ -115,6 +160,56 @@ fn parse<'a>(code: &mut Peekable<Chars<'a>>, loopp: bool) -> Vec<Instruction> {
     }
 
     program
+}
+
+fn optimize_loop(c: Vec<Instruction>) -> Instruction {
+    if c.len() == 1 && c[0] == Instruction::Decrement(1) {
+        return Instruction::SetToZero;
+    } else if c.len() == 4 {
+        // ->+<
+        if c[0].decp() && c[1].forwardp() && c[2].incp() && c[3].backp() {
+            if c[0].add_count() == c[2].add_count() && c[1].move_count() == c[3].move_count() {
+                return Instruction::Add(c[1].move_count());
+            }
+        // >+<-
+        } else if c[0].forwardp() && c[1].incp() && c[2].backp() && c[3].decp() {
+            if c[1].add_count() == c[3].add_count() && c[0].move_count() == c[2].move_count() {
+                return Instruction::Add(c[0].move_count());
+            }
+        // -<+>
+        } else if c[0].decp() && c[1].backp() && c[2].incp() && c[3].forwardp() {
+            if c[0].add_count() == c[2].add_count() && c[1].move_count() == c[3].move_count() {
+                return Instruction::Add(-c[1].move_count());
+            }
+        // <+>-
+        } else if c[0].backp() && c[1].incp() && c[2].forwardp() && c[3].decp() {
+            if c[1].add_count() == c[3].add_count() && c[0].move_count() == c[2].move_count() {
+                return Instruction::Add(-c[0].move_count());
+            }
+        // ->-<
+        } else if c[0].decp() && c[1].forwardp() && c[2].decp() && c[3].backp() {
+            if c[0].add_count() == c[2].add_count() && c[1].move_count() == c[3].move_count() {
+                return Instruction::Sub(c[1].move_count());
+            }
+        // >-<-
+        } else if c[0].forwardp() && c[1].decp() && c[2].backp() && c[3].decp() {
+            if c[1].add_count() == c[3].add_count() && c[0].move_count() == c[2].move_count() {
+                return Instruction::Sub(c[0].move_count());
+            }
+        // -<->
+        } else if c[0].decp() && c[1].backp() && c[2].decp() && c[3].forwardp() {
+            if c[0].add_count() == c[2].add_count() && c[1].move_count() == c[3].move_count() {
+                return Instruction::Sub(-c[1].move_count());
+            }
+        // <->-
+        } else if c[0].backp() && c[1].decp() && c[2].forwardp() && c[3].decp() {
+            if c[1].add_count() == c[3].add_count() && c[0].move_count() == c[2].move_count() {
+                return Instruction::Sub(-c[0].move_count());
+            }
+        }
+    }
+
+    Instruction::Loop(c)
 }
 
 fn compile(program: &[Instruction]) -> Vec<u8> {
@@ -158,6 +253,32 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
                 asm.pop_reg(Register::RDI);
             }
             Instruction::SetToZero => asm.mov_addr_imm(Register::RDI, None, Immediate::U8(0)),
+            Instruction::Add(i) => {
+                let i = *i;
+                asm.mov_reg_addr(Register::AL, Register::RDI, None);
+                asm.sub_addr_reg(Register::RDI, Register::AL, None);
+                let disp = if i >= i8::MIN as i32 && i <= i8::MAX as i32 {
+                    Displacement::Disp8(NonZeroI8::new(i as i8).unwrap())
+                } else if i >= i16::MIN as i32 && i <= i16::MAX as i32 {
+                    Displacement::Disp16(NonZeroI16::new(i as i16).unwrap())
+                } else {
+                    Displacement::Disp32(NonZeroI32::new(i).unwrap())
+                };
+                asm.add_addr_reg(Register::RDI, Register::AL, Some(disp));
+            }
+            Instruction::Sub(i) => {
+                let i = *i;
+                asm.mov_reg_addr(Register::AL, Register::RDI, None);
+                asm.sub_addr_reg(Register::RDI, Register::AL, None);
+                let disp = if i >= i8::MIN as i32 && i <= i8::MAX as i32 {
+                    Displacement::Disp8(NonZeroI8::new(i as i8).unwrap())
+                } else if i >= i16::MIN as i32 && i <= i16::MAX as i32 {
+                    Displacement::Disp16(NonZeroI16::new(i as i16).unwrap())
+                } else {
+                    Displacement::Disp32(NonZeroI32::new(i).unwrap())
+                };
+                asm.sub_addr_reg(Register::RDI, Register::AL, Some(disp));
+            }
             Instruction::Loop(p) => {
                 let loopl = make_label();
                 let donel = make_label();
