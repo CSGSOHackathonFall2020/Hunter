@@ -161,11 +161,13 @@ fn _compile(program: &mut Iter<Instruction>, asm: &mut Assembler) {
             Instruction::Loop(p) => {
                 let loopl = make_label();
                 let donel = make_label();
-                asm.label(loopl.clone());
+                // Initial loop test
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
                 asm.and_reg_imm(Register::R9, 0xff);
                 asm.test(Register::R9, Register::R9);
                 asm.jz(donel.clone());
+
+                asm.label(loopl.clone());
                 _compile(&mut p.iter(), asm);
                 asm.mov_reg_addr(Register::R9, Register::RDI, None);
                 asm.and_reg_imm(Register::R9, 0xff);
